@@ -11,11 +11,8 @@ class Link:
         length: the total length of this link.
         start_loc: starting loc.
 
-        Returns:
-            
         """
 
-        # unchangable ...
         self._link_id = link_id
         self._mean_speed = mean_speed
         self._cv_speed = cv_speed
@@ -24,31 +21,36 @@ class Link:
         self._end_loc = start_loc + length
         self._next_stop = None
 
+        # for signals, no need to look at it
         self._signals = []
         self._sublink_dict = defaultdict(lambda: list) # 'no' -> bus list
         self._sublink_dict[0] = []
 
-        # changable ...
-
     def __call__(self, next_stop):
+        '''
+        For linking the stop and link
+        '''
         self._next_stop = next_stop
 
+    # for signals, no need to look at it
     def add_signal(self, signal):
         self._signals.append(signal)
         current_no = len(self._sublink_dict)
         self._sublink_dict[current_no] = []
 
     def enter_bus(self, bus, sub_link_no):
+        '''
+        When the bus in the stop finishes the service, enter it into the link
+        '''
         bus.loc = self._start_loc
         bus.travel_speed_this_link = np.random.normal(self._mean_speed, self._cv_speed*self._mean_speed)
         self._sublink_dict[sub_link_no].append(bus)
 
-        # speed = np.random.normal(self._mean_speed, self._cv_speed*self._mean_speed, len(buses_before_signals))
-
     def forward(self, delta_t, curr_time):
-        # divide the link by signal
-        # print(len(self._signals))
-
+        '''
+        Advance the bus on the link, according to its randomly-generated travel speed
+        Note that the implementation in this function contains the operations on the signalized intersection. If you have any question, feel free to contact me
+        '''
         for sub_link_no in range(len(self._sublink_dict)):
             buses_on_sub_link = self._sublink_dict[sub_link_no] 
             

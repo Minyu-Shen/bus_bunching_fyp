@@ -1,3 +1,7 @@
+'''
+This file is for the signalized intersection. Only look at them when you are interested.
+'''
+
 class Signal(object):
     def __init__(self, signal_id, cycle_length, green_ratio, offset, start_loc):
         # unchangable ...

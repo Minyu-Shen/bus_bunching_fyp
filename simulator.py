@@ -9,14 +9,15 @@ import matplotlib.pyplot as plt
 
 class Simulator(object):
     def __init__(self, sim_duration, dspt_times, \
-        stop_locs, demand_rates, board_rates, stop_num, \
+        stop_locs, demand_rates, board_rates, stop_num, demand_start_times,\
             link_mean_speeds, link_cv_speeds, link_lengths, link_start_locs, \
                 cycle_lengths, green_ratios, signal_offsets, signal_locs):
 
-
+        # the following metrics are passed from the "parameters.py" and they are fixed
         self._stop_locs = stop_locs
         self._demand_rates = demand_rates
         self._board_rates = board_rates
+        self._demand_start_times = demand_start_times
         self._link_mean_speeds = link_mean_speeds
         self._link_cv_speeds = link_cv_speeds
         self._link_lengths = link_lengths
@@ -26,8 +27,6 @@ class Simulator(object):
         self._signal_offsets = signal_offsets
         self._signal_locs = signal_locs
         self._stop_num = stop_num
-        
-
         # current simulation time
         self._curr_time = 0.0
         # counting the total bus for creating bus id
@@ -38,23 +37,21 @@ class Simulator(object):
         self._sim_duration = sim_duration
         # dispatch plans
         self._dspt_times = deepcopy(dspt_times)
-        
 
-        # unchangable ...
         ### init stops
-        self._stop_list = []
-        for index, (loc, demand_rate, self._board_rates) in \
-                enumerate(zip(self._stop_locs, self._demand_rates, self._board_rates)):
-            stop = Stop(index, loc, demand_rate, self._board_rates)
+        self._stop_list = [] # an array for holding all the stops
+        for index, (loc, demand_rate, board_rate, demand_start_time) in \
+                enumerate(zip(self._stop_locs, self._demand_rates, self._board_rates, self._demand_start_times)):
+            stop = Stop(index, loc, demand_rate, board_rate, demand_start_time)
             self._stop_list.append(stop)
         ### init links
-        self._link_list = []
+        self._link_list = [] # an array for holding all the links
         for index, (mean_speed, cv_speed, length, start_loc) in \
                 enumerate(zip(self._link_mean_speeds, self._link_cv_speeds, self._link_lengths, self._link_start_locs)):
             link = Link(index, mean_speed, cv_speed, length, start_loc)
             self._link_list.append(link)
         ### init signals
-        self._signal_list = []
+        self._signal_list = [] # an array for holding all the signals
         for index, (cycle_length, green_ratio, offset, start_loc) in \
                 enumerate(zip(self._cycle_lengths, self._green_ratios, self._signal_offsets, self._signal_locs)):
             signal = Signal(index, cycle_length, green_ratio, offset, start_loc)
@@ -74,18 +71,10 @@ class Simulator(object):
             if index != self._stop_num-1:
                 stop(self._link_list[index+1])
 
-
-    def distribute_initial_buses(self):
-        m = 2
-        n = self._stop_num // m
-        for bs in range(n-1):
-            enter_link_no = (bs+1) * m
-            bus = Bus(self._total_bus, self._stop_num)
-            self._total_bus += 1
-            self._link_list[enter_link_no].enter_bus(bus, 0)
-            self._total_bus_list.append(bus)
-
     def dispatch(self):
+        '''
+        At ech time step, check if the bus can be dispatched from the terminal stop
+        '''
         if self._dspt_times:
             if self._curr_time >= self._dspt_times[0]:
                 bus = Bus(self._total_bus, self._stop_num)
@@ -95,6 +84,9 @@ class Simulator(object):
                 self._total_bus_list.append(bus)
 
     def move_one_step(self, delta_t):
+        '''
+        At each time step, advance the simulation system one step
+        '''
         # check if dispatch bus into the first link
         self.dispatch()
         # if any bus has arrived at the stop, stop->arrived buses
@@ -108,7 +100,7 @@ class Simulator(object):
                     return True
                 for bus in stop_arrived_buses:
                     bus.arr_times[index] = self._curr_time
-                stop.operation(delta_t, self._curr_time)
+                stop.operation(delta_t, self._curr_time) # operations at each stop
                 if stop_arrived_buses:
                     total_arrived_buses[index] = stop_arrived_buses
             
@@ -118,6 +110,9 @@ class Simulator(object):
         
 
     def plot_time_space(self):
+        '''
+        This function is used for plotting the time-space diagram, the horizontal lines in the graph are from the parameter settings in "parameters.py". The bus trajectories used in the graph are from each bus object (see bus.py).
+        '''
         # plot stops
         for stop_loc in self._stop_locs:
             plt.hlines(stop_loc, 0, self._sim_duration, linestyles='dashed', linewidth=1.0)
@@ -133,12 +128,13 @@ class Simulator(object):
                 # plot red period
                 plt.hlines(signal_loc, offset+i*C+G, offset+(i+1)*C, linewidth=1.0, colors='r')
 
-
+        # plot the bus trajectories
         for bus in self._total_bus_list:
             t, x = zip(*bus.trajectories.items())
-            plt.plot(t, x)
+            plt.plot(t, x, color='black')
         plt.show()
 
+    # for signal, just ignore it
     def get_signal_headways(self, signal_id):
         signal = self._signal_list[signal_id]
         arr_times = np.asarray(signal.arr_times)
@@ -146,6 +142,9 @@ class Simulator(object):
         return np.diff(np.sort(arr_times)), np.diff(np.sort(dpt_times))
 
     def get_stop_headways(self, stop_id):
+        '''
+        Get the headways at each stop
+        '''
         stop = self._stop_list[stop_id]
         arr_times = np.asarray(stop.arr_times)
         return list(np.diff(np.sort(arr_times)))
